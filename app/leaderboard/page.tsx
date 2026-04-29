@@ -248,7 +248,7 @@ export default function LeaderboardPage() {
               </div>
             ) : (
               <div className="flex flex-col gap-3">
-                {data.staff.map((person, i) => (
+                {data.staff.map((person) => (
                   <RankCard key={person.name} person={person} />
                 ))}
               </div>
