@@ -1,0 +1,5 @@
+{
+  "framework": "nextjs",
+  "buildCommand": "next build --no-turbopack",
+  "installCommand": "npm install"
+}
