@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
+import { useState, useCallback } from "react";
 import { format, startOfMonth, subMonths } from "date-fns";
 import Nav from "@/components/Nav";
 

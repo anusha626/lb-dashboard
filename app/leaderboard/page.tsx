@@ -23,7 +23,7 @@ const RANK_STYLES: Record<number, { ring: string; bg: string; num: string }> = {
   3: { ring: "#cd7c47", bg: "rgba(205,124,71,0.1)", num: "#cd7c47" },
 };
 
-function RankCard({ person, i }: { person: StaffStats; i: number }) {
+function RankCard({ person }: { person: StaffStats }) {
   const style = RANK_STYLES[person.rank] ?? { ring: "var(--border)", bg: "var(--bg-card)", num: "var(--text-secondary)" };
   const isTop3 = person.rank <= 3;
 
@@ -249,7 +249,7 @@ export default function LeaderboardPage() {
             ) : (
               <div className="flex flex-col gap-3">
                 {data.staff.map((person, i) => (
-                  <RankCard key={person.name} person={person} i={i} />
+                  <RankCard key={person.name} person={person} />
                 ))}
               </div>
             )}

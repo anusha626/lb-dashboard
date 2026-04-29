@@ -2,8 +2,6 @@ import { format, differenceInDays, parseISO } from "date-fns";
 import {
   ESOrder,
   ESProduct,
-  getLineItemCostPrice,
-  getLineItemSellingPrice,
   getOrderBranch,
   getProductCostPrice,
   getProductSellingPrice,
@@ -153,8 +151,6 @@ export function buildProductRows(
     const costPrice = getProductCostPrice(p);
     const profitRM = sellingPrice - costPrice;
     const profitPct = costPrice > 0 ? (profitRM / costPrice) * 100 : 0;
-    const inventory = getProductInventory(p);
-
     // Determine status:
     // - Found in an order → Sold
     // - inventory > 0 and published → Active
