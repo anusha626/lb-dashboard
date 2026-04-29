@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from "next/server";
-import { unstable_cache } from "next/cache";
 import { fetchOrders, getSalesperson, getOrderBranch } from "@/lib/easystore";
 
 export interface StaffStats {
@@ -107,10 +106,6 @@ async function computeLeaderboard(from: string, to: string): Promise<Leaderboard
     };
 }
 
-// 5 min cache for current period, 12 hours for past periods
-const getCachedLeaderboard = unstable_cache(computeLeaderboard, ["leaderboard-current"], { revalidate: 300 });
-const getCachedLeaderboardPast = unstable_cache(computeLeaderboard, ["leaderboard-past"], { revalidate: 43200 });
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const from = searchParams.get("from");
@@ -121,10 +116,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const today = new Date().toISOString().slice(0, 10);
-    const data = to < today
-      ? await getCachedLeaderboardPast(from, to)
-      : await getCachedLeaderboard(from, to);
+    const data = await computeLeaderboard(from, to);
     return NextResponse.json(data satisfies LeaderboardData);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
