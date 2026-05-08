@@ -56,9 +56,8 @@ export default function ProductPerformancePage() {
   const [dateTo, setDateTo] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
-  // GAS returns all products in one shot — no pagination needed
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const loadPage = useCallback(async (_p?: number, _append?: boolean) => {
+  // GAS returns all products in one shot — single fetch, no pagination
+  async function fetchProducts() {
     setLoading(true);
     setError(null);
     try {
@@ -75,9 +74,12 @@ export default function ProductPerformancePage() {
       setLoading(false);
       setLoadingAll(false);
     }
-  }, []);
+  }
 
-  const loadAll = loadPage;
+  // Keep old names so the rest of the JSX compiles without changes
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const loadPage = (_p?: number, _append?: boolean) => fetchProducts();
+  const loadAll = fetchProducts;
 
   useEffect(() => {
     loadAll();
