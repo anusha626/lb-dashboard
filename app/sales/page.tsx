@@ -236,10 +236,13 @@ export default function SalesExportPage() {
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-primary)" }}>{row.Customer || "—"}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>{row.Location}</td>
+                            <td className="px-4 py-2.5 text-xs" style={{ color: "var(--text-secondary)", maxWidth: 180, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={row.Item}>{row.Item || "—"}</td>
                             <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{row.Product_SKU || "—"}</td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-xs text-center" style={{ color: "var(--text-primary)" }}>{row.Quantity || "—"}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-right" style={{ color: "var(--accent)" }}>
                               {formatRM(parseFloat(row.Sale_Price) || 0)}
+                            </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap text-right text-xs" style={{ color: "var(--text-secondary)" }}>
+                              {parseFloat(row.GP) > 0 ? formatRM(parseFloat(row.GP)) : "—"}
                             </td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>{row.Channel}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>{row.Transaction_Type}</td>
