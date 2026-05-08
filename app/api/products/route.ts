@@ -1,78 +1,91 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { getHeaders } from "@/lib/easystore";
-import { buildProductRowsLight } from "@/lib/transforms";
-import type { ESProduct } from "@/lib/easystore";
+import { fetchGAS } from "@/lib/gas";
+import type { GASProduct } from "@/lib/gas";
+import type { ProductRow } from "@/lib/transforms";
 
-const BASE_URL = "https://lbstore.easy.co/api/3.0";
-const PAGE_SIZE = 250;
-
-async function fetchPage(page: number): Promise<{ products: ESProduct[]; totalCount: number }> {
-  const qs = new URLSearchParams({
-    limit: String(PAGE_SIZE),
-    page: String(page),
-    sort: "created_at.asc",
-  });
-  const res = await fetch(`${BASE_URL}/products.json?${qs}`, {
-    headers: getHeaders(),
-    next: { revalidate: 1800 },
-  });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`EasyStore API error ${res.status}: ${text}`);
+// Try to parse multiple date formats and return "dd MMM yyyy"
+function formatListedDate(raw: string): string {
+  if (!raw) return "—";
+  // ISO: "2026-01-15"
+  const iso = raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (iso) {
+    const d = new Date(`${iso[1]}-${iso[2]}-${iso[3]}T12:00:00`);
+    return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
   }
-  const json = await res.json();
-  return { products: json.products ?? [], totalCount: json.total_count ?? 0 };
+  // DD/MM/YYYY: "15/01/2026"
+  const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmy) {
+    const d = new Date(`${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}T12:00:00`);
+    return d.toLocaleDateString("en-MY", { day: "2-digit", month: "short", year: "numeric" });
+  }
+  return raw; // return as-is if unparseable
 }
 
-// Cache a single page for 30 minutes
-const getCachedPage = unstable_cache(
-  async (page: number) => {
-    const { products, totalCount } = await fetchPage(page);
-    const rows = buildProductRowsLight(products, new Date());
-    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-    return { rows, page, totalPages, totalCount };
+// Return ISO "YYYY-MM-DD" for date comparison in filters
+function isoFromListedDate(raw: string): string {
+  if (!raw) return "";
+  const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+  if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+  return "";
+}
+
+function mapGASProduct(p: GASProduct, i: number): ProductRow & { listedDateISO: string } {
+  const daysListed = Number(p.days_listed) || 0;
+  const statusStr = (p.status || "").toLowerCase();
+  const isSold = p.sold === true || statusStr === "sold";
+  const isActive = !isSold && (p.active === true || statusStr === "active");
+
+  let status: ProductRow["status"];
+  let daysLabel: string;
+  if (isSold) {
+    status = "Sold";
+    daysLabel = `${daysListed}d`;
+  } else if (isActive) {
+    status = "Active";
+    daysLabel = `${daysListed}d (active)`;
+  } else {
+    status = "Draft";
+    daysLabel = `${daysListed}d (draft)`;
+  }
+
+  return {
+    id: i,
+    name: p.name || "—",
+    sku: p.sku || "—",
+    brand: "-",
+    branch: p.branch || "—",
+    createdAt: formatListedDate(p.listed_date),   // display-friendly
+    listedDateISO: isoFromListedDate(p.listed_date), // for date filter
+    daysToSell: daysListed,
+    daysLabel,
+    status,
+    sellingPrice: Number(p.sell_price) || 0,
+    costPrice: Number(p.cost) || 0,
+    profitRM: Number(p.profit) || 0,
+    profitPct: Number(p.margin_pct) || 0,
+    inventory: Number(p.easystore_inventory) || 0,
+  };
+}
+
+const getCachedProducts = unstable_cache(
+  async () => {
+    const data = await fetchGAS<{ products: GASProduct[] }>({ endpoint: "products" }, 1800);
+    const products = data.products ?? [];
+    const rows = products.map(mapGASProduct);
+    return { rows, totalCount: rows.length };
   },
-  ["products-page"],
+  ["gas-products-v1"],
   { revalidate: 1800 }
 );
 
-// Cache the full product list for 1 hour
-const getCachedAllProducts = unstable_cache(
-  async () => {
-    const { products: firstPage, totalCount } = await fetchPage(1);
-    const totalPages = Math.ceil(totalCount / PAGE_SIZE);
-    const remaining = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-    const allProducts: ESProduct[] = [...firstPage];
-    const BATCH = 6;
-
-    for (let i = 0; i < remaining.length; i += BATCH) {
-      const batch = remaining.slice(i, i + BATCH);
-      const results = await Promise.allSettled(batch.map((p) => fetchPage(p)));
-      for (const r of results) {
-        if (r.status === "fulfilled") allProducts.push(...r.value.products);
-      }
-    }
-
-    const rows = buildProductRowsLight(allProducts, new Date());
-    return { rows, totalPages, totalCount };
-  },
-  ["products-all"],
-  { revalidate: 3600 }
-);
-
-export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url);
-  const page = parseInt(searchParams.get("page") ?? "1", 10);
-  const loadAll = searchParams.get("all") === "1";
-
+export async function GET() {
   try {
-    if (loadAll) {
-      const { rows, totalPages, totalCount } = await getCachedAllProducts();
-      return NextResponse.json({ rows, page: totalPages, totalPages, totalCount });
-    }
-    const result = await getCachedPage(page);
-    return NextResponse.json(result);
+    const { rows, totalCount } = await getCachedProducts();
+    // Always return everything — GAS delivers all products in one shot
+    return NextResponse.json({ rows, page: 1, totalPages: 1, totalCount });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ error: message }, { status: 500 });

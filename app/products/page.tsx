@@ -56,45 +56,30 @@ export default function ProductPerformancePage() {
   const [dateTo, setDateTo] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
-  const loadPage = useCallback(async (p: number, append: boolean) => {
-    if (!append) setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch(`/api/products?page=${p}`);
-      const json = await res.json();
-      if (json.error) throw new Error(json.error);
-      setRows((prev) => append ? [...prev, ...(json.rows ?? [])] : (json.rows ?? []));
-      setTotalPages(json.totalPages ?? 1);
-      setTotalCount(json.totalCount ?? 0);
-      setPage(p);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : String(e));
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
+  // GAS returns all products in one shot — no pagination needed
   const loadAll = useCallback(async () => {
-    setLoadingAll(true);
+    setLoading(true);
     setError(null);
     try {
       const res = await fetch(`/api/products?all=1`);
       const json = await res.json();
       if (json.error) throw new Error(json.error);
       setRows(json.rows ?? []);
-      setTotalPages(json.totalPages ?? 1);
+      setTotalPages(1);
       setTotalCount(json.totalCount ?? 0);
-      setPage(json.totalPages ?? 1);
+      setPage(1);
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e));
     } finally {
+      setLoading(false);
       setLoadingAll(false);
     }
   }, []);
 
+  const loadPage = loadAll; // alias — kept for compatibility
+
   useEffect(() => {
-    // Show first 250 instantly, then silently load everything else
-    loadPage(1, false).then(() => loadAll());
+    loadAll();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const branches = useMemo(() => {
@@ -123,12 +108,17 @@ export default function ProductPerformancePage() {
       );
     }
     if (dateFrom) {
-      const from = new Date(dateFrom + "T00:00:00");
-      out = out.filter((r) => new Date(r.createdAt) >= from);
+      // listedDateISO is "YYYY-MM-DD"; dateFrom is also "YYYY-MM-DD" — string compare works
+      out = out.filter((r) => {
+        const iso = (r as unknown as { listedDateISO?: string }).listedDateISO ?? r.createdAt;
+        return iso >= dateFrom;
+      });
     }
     if (dateTo) {
-      const to = new Date(dateTo + "T23:59:59");
-      out = out.filter((r) => new Date(r.createdAt) <= to);
+      out = out.filter((r) => {
+        const iso = (r as unknown as { listedDateISO?: string }).listedDateISO ?? r.createdAt;
+        return iso <= dateTo;
+      });
     }
     return [...out].sort((a, b) => {
       const av = a[sortKey];
@@ -270,7 +260,7 @@ export default function ProductPerformancePage() {
         {loadingAll && (
           <div className="mb-5">
             <div className="flex justify-between text-xs mb-1.5" style={{ color: "var(--text-secondary)" }}>
-              <span>Fetching from EasyStore…</span>
+              <span>Loading from Google Sheets…</span>
               <span>{rows.length.toLocaleString()} / {totalCount.toLocaleString()}</span>
             </div>
             <div className="w-full rounded-full h-1.5" style={{ background: "var(--border)" }}>

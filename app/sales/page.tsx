@@ -16,21 +16,23 @@ interface SalesRow {
   Customer: string;
   Location: string;
   Product_SKU: string;
-  Quantity: string;
+  Item: string;
   Sale_Price: string;
+  GP: string;
   Channel: string;
   Transaction_Type: string;
 }
 
 const COLUMNS = [
-  { key: "Order_ID",        label: "Order ID" },
   { key: "Order_Date",      label: "Date" },
+  { key: "Order_ID",        label: "Order ID" },
   { key: "Salesperson",     label: "Salesperson" },
   { key: "Customer",        label: "Customer" },
   { key: "Location",        label: "Location" },
+  { key: "Item",            label: "Item" },
   { key: "Product_SKU",     label: "SKU" },
-  { key: "Quantity",        label: "Qty (HQ)" },
   { key: "Sale_Price",      label: "Sale Price (RM)" },
+  { key: "GP",              label: "GP (RM)" },
   { key: "Channel",         label: "Channel" },
   { key: "Transaction_Type",label: "Type" },
 ];
@@ -87,11 +89,12 @@ export default function SalesExportPage() {
     if (!search.trim()) return true;
     const q = search.toLowerCase();
     return (
-      r.Order_ID.toLowerCase().includes(q) ||
-      r.Salesperson.toLowerCase().includes(q) ||
+      (r.Order_ID ?? "").toLowerCase().includes(q) ||
+      (r.Salesperson ?? "").toLowerCase().includes(q) ||
       (r.Customer ?? "").toLowerCase().includes(q) ||
-      r.Product_SKU.toLowerCase().includes(q) ||
-      r.Location.toLowerCase().includes(q)
+      (r.Product_SKU ?? "").toLowerCase().includes(q) ||
+      (r.Item ?? "").toLowerCase().includes(q) ||
+      (r.Location ?? "").toLowerCase().includes(q)
     );
   });
 

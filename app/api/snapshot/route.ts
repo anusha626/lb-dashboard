@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { fetchOrders, fetchProducts, getSalesperson, getOrderBranch, isPaidOrder } from "@/lib/easystore";
-import { buildProductRowsLight } from "@/lib/transforms";
+import { fetchGAS } from "@/lib/gas";
+import type { GASSale, GASProduct } from "@/lib/gas";
 
 export interface SnapshotData {
   revenue: number;
@@ -21,52 +21,50 @@ export interface SnapshotData {
 }
 
 async function computeSnapshot(from: string, to: string): Promise<SnapshotData> {
-  const [orders, products] = await Promise.all([
-    fetchOrders({
-      created_at_min: `${from}T00:00:00+08:00`,
-      created_at_max: `${to}T23:59:59+08:00`,
-      status: "any",
-    }),
-    fetchProducts(),
+  const [salesData, productsData] = await Promise.all([
+    fetchGAS<{ sales: GASSale[] }>({ endpoint: "sales", from, to }, 300),
+    fetchGAS<{ products: GASProduct[] }>({ endpoint: "products" }, 1800),
   ]);
 
+  const sales = salesData.sales ?? [];
+  const products = productsData.products ?? [];
+
+  // Revenue / GP
   let revenue = 0;
-  let cost = 0;
+  let gp = 0;
+  const orderSet = new Set<string>();
   const branchMap = new Map<string, { revenue: number; count: number }>();
   const staffMap = new Map<string, { revenue: number; transactions: number }>();
 
-  for (const order of orders) {
-    if (!isPaidOrder(order)) continue; // skip pending / voided / refunded
-    const orderRevenue = parseFloat(order.total_price) || 0;
-    const orderCost = order.line_items.reduce(
-      (s, li) => s + (parseFloat(li.cost_price ?? "0") || 0) * li.quantity,
-      0
-    );
-    revenue += orderRevenue;
-    cost += orderCost;
+  for (const s of sales) {
+    const sell = Number(s.sell) || 0;
+    const gpVal = Number(s.gp) || 0;
+    revenue += sell;
+    gp += gpVal;
+    orderSet.add(s.order_number);
 
-    const branch = getOrderBranch(order);
+    const branch = s.branch || "Unknown";
     const br = branchMap.get(branch) ?? { revenue: 0, count: 0 };
-    br.revenue += orderRevenue;
+    br.revenue += sell;
     br.count += 1;
     branchMap.set(branch, br);
 
-    const name = getSalesperson(order);
-    if (name !== "Company Sale") {
-      const sp = staffMap.get(name) ?? { revenue: 0, transactions: 0 };
-      sp.revenue += orderRevenue;
+    const person = s.sales_person || "Unknown";
+    if (person !== "Company Sale") {
+      const sp = staffMap.get(person) ?? { revenue: 0, transactions: 0 };
+      sp.revenue += sell;
       sp.transactions += 1;
-      staffMap.set(name, sp);
+      staffMap.set(person, sp);
     }
   }
 
-  const gp = revenue - cost;
+  const orderCount = orderSet.size || sales.length;
   const gpPct = revenue > 0 ? (gp / revenue) * 100 : 0;
-  const paidCount = Array.from(branchMap.values()).reduce((s, b) => s + b.count, 0);
-  const aov = paidCount > 0 ? revenue / paidCount : 0;
+  const aov = orderCount > 0 ? revenue / orderCount : 0;
 
   const byBranch = Array.from(branchMap.entries())
     .map(([branch, d]) => ({ branch, ...d }))
+    .filter((b) => b.branch !== "Unknown")
     .sort((a, b) => b.revenue - a.revenue);
 
   const leaderboard = Array.from(staffMap.entries())
@@ -74,25 +72,22 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  // Inventory aging
-  const today = new Date();
-  const rows = buildProductRowsLight(products, today);
-  const active = rows.filter((r) => r.status === "Active");
-  const aged90 = active.filter((r) => r.daysToSell > 90);
-  const aged60 = active.filter((r) => r.daysToSell > 60 && r.daysToSell <= 90);
-  const aged30 = active.filter((r) => r.daysToSell > 30 && r.daysToSell <= 60);
-  const aged90Value = aged90.reduce((s, r) => s + r.costPrice, 0);
+  // Inventory aging from GAS products
+  const activeProducts = products.filter((p) => {
+    const statusLower = (p.status || "").toLowerCase();
+    return !p.sold && (p.active || statusLower === "active");
+  });
+
+  const aged90 = activeProducts.filter((p) => Number(p.days_listed) > 90);
+  const aged60 = activeProducts.filter((p) => Number(p.days_listed) > 60 && Number(p.days_listed) <= 90);
+  const aged30 = activeProducts.filter((p) => Number(p.days_listed) > 30 && Number(p.days_listed) <= 60);
+  const aged90Value = aged90.reduce((s, p) => s + (Number(p.cost) || 0), 0);
 
   return {
-    revenue,
-    gp,
-    gpPct,
-    aov,
-    orderCount: paidCount,
-    byBranch,
-    leaderboard,
+    revenue, gp, gpPct, aov, orderCount,
+    byBranch, leaderboard,
     inventory: {
-      active: active.length,
+      active: activeProducts.length,
       aged30: aged30.length,
       aged60: aged60.length,
       aged90: aged90.length,
@@ -101,8 +96,8 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
   };
 }
 
-const getCachedSnapshot = unstable_cache(computeSnapshot, ["snapshot-current"], { revalidate: 300 });
-const getCachedSnapshotPast = unstable_cache(computeSnapshot, ["snapshot-past"], { revalidate: 43200 });
+const getCachedSnapshot = unstable_cache(computeSnapshot, ["gas-snapshot-v1-current"], { revalidate: 300 });
+const getCachedSnapshotPast = unstable_cache(computeSnapshot, ["gas-snapshot-v1-past"], { revalidate: 1800 });
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
