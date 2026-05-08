@@ -177,26 +177,20 @@ export async function fetchLocations(): Promise<ESLocation[]> {
 
 // ── Field mapping helpers ──────────────────────────────────────────────────
 
-// Canonical staff name map — normalise note variations → display name
-const STAFF_NAME_MAP: Record<string, string> = {
-  "minkei":       "Min Kei",
-  "min kei":      "Min Kei",
-  "lbite minkei": "Min Kei",
-  "eronne":       "Eronne",
-  "eronne khoo":  "Eronne",
-  "eileen":       "Eileen",
-  "eileen ooi":   "Eileen",
-  "frankie":      "Frankie",
-  "riska":        "Riska",
-  "riska lbite":  "Riska",
-  "thong shiung": "Thong Shiung",
-  "pheng thong":  "Pheng Thong",
-  "anusha":       "Anusha",
-  "adelyn":       "Adelyn",
-  "nisa":         "Nisa",
-  "lily":         "Lily",
-  "sa lily":      "Lily",
-};
+// Load staff config from data/staff.json and build lookup map
+import staffConfig from "@/data/staff.json";
+
+function buildStaffMap(): Record<string, string> {
+  const map: Record<string, string> = {};
+  for (const entry of staffConfig as { display: string; aliases: string[] }[]) {
+    for (const alias of entry.aliases) {
+      map[alias.toLowerCase()] = entry.display;
+    }
+  }
+  return map;
+}
+
+const STAFF_NAME_MAP = buildStaffMap();
 
 function normaliseName(raw: string): string {
   return STAFF_NAME_MAP[raw.toLowerCase().trim()] ?? raw;

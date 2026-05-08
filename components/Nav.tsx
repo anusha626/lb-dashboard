@@ -11,6 +11,7 @@ export default function Nav() {
     { href: "/products", label: "Products" },
     { href: "/sales", label: "Sales Data" },
     { href: "/snapshot", label: "📊 Snapshot" },
+    { href: "/staff", label: "👤 Staff" },
   ];
 
   return (
