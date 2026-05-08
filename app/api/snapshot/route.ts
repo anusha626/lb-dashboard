@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { fetchOrders, fetchProducts, getSalesperson, getOrderBranch } from "@/lib/easystore";
+import { fetchOrders, fetchProducts, getSalesperson, getOrderBranch, isPaidOrder } from "@/lib/easystore";
 import { buildProductRowsLight } from "@/lib/transforms";
 
 export interface SnapshotData {
@@ -36,6 +36,7 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
   const staffMap = new Map<string, { revenue: number; transactions: number }>();
 
   for (const order of orders) {
+    if (!isPaidOrder(order)) continue; // skip pending / voided / refunded
     const orderRevenue = parseFloat(order.total_price) || 0;
     const orderCost = order.line_items.reduce(
       (s, li) => s + (parseFloat(li.cost_price ?? "0") || 0) * li.quantity,
@@ -61,7 +62,8 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
 
   const gp = revenue - cost;
   const gpPct = revenue > 0 ? (gp / revenue) * 100 : 0;
-  const aov = orders.length > 0 ? revenue / orders.length : 0;
+  const paidCount = Array.from(branchMap.values()).reduce((s, b) => s + b.count, 0);
+  const aov = paidCount > 0 ? revenue / paidCount : 0;
 
   const byBranch = Array.from(branchMap.entries())
     .map(([branch, d]) => ({ branch, ...d }))
@@ -86,7 +88,7 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
     gp,
     gpPct,
     aov,
-    orderCount: orders.length,
+    orderCount: paidCount,
     byBranch,
     leaderboard,
     inventory: {

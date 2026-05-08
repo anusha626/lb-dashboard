@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { unstable_cache } from "next/cache";
-import { fetchOrders, getSalesperson, getOrderBranch, getCustomerName } from "@/lib/easystore";
+import { fetchOrders, getSalesperson, getOrderBranch, getCustomerName, isPaidOrder } from "@/lib/easystore";
 import { extractBrand } from "@/lib/transforms";
 import { format, parseISO } from "date-fns";
 
@@ -41,6 +41,7 @@ async function computeSalesRows(from: string, to: string): Promise<Record<string
   const rows: Record<string, string>[] = [];
 
   for (const order of orders) {
+    if (!isPaidOrder(order)) continue; // skip pending / voided / refunded
     const salesperson = getSalesperson(order);
     const location = getOrderBranch(order);
     const customerName = getCustomerName(order);
@@ -94,8 +95,8 @@ async function computeSalesRows(from: string, to: string): Promise<Record<string
 }
 
 // 5 min for current period, 12 hours for completed past periods
-const getCachedRows = unstable_cache(computeSalesRows, ["sales-export-current-v4"], { revalidate: 300 });
-const getCachedRowsPast = unstable_cache(computeSalesRows, ["sales-export-past-v4"], { revalidate: 43200 });
+const getCachedRows = unstable_cache(computeSalesRows, ["sales-export-current-v5"], { revalidate: 300 });
+const getCachedRowsPast = unstable_cache(computeSalesRows, ["sales-export-past-v5"], { revalidate: 43200 });
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

@@ -194,6 +194,8 @@ const STAFF_NAME_MAP: Record<string, string> = {
   "anusha":       "Anusha",
   "adelyn":       "Adelyn",
   "nisa":         "Nisa",
+  "lily":         "Lily",
+  "sa lily":      "Lily",
 };
 
 function normaliseName(raw: string): string {
@@ -276,4 +278,10 @@ export function getProductSKU(product: ESProduct): string {
 
 export function getProductInventory(product: ESProduct): number {
   return product.variants[0]?.inventory_quantity ?? 0;
+}
+
+// Only count orders that have been paid (exclude pending, voided, refunded)
+const PAID_STATUSES = new Set(["paid", "partially_paid", "partially_refunded"]);
+export function isPaidOrder(order: ESOrder): boolean {
+  return PAID_STATUSES.has(order.financial_status);
 }
