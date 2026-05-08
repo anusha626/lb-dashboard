@@ -13,31 +13,55 @@ export function getHeaders() {
   };
 }
 
+async function fetchOnePage<T>(
+  path: string,
+  resultsKey: string,
+  page: number,
+  limit: number,
+  params: Record<string, string>,
+  revalidate: number,
+  retries = 3
+): Promise<{ batch: T[]; total: number }> {
+  const qs = new URLSearchParams({ limit: String(limit), page: String(page), ...params });
+  const url = `${BASE_URL}${path}?${qs}`;
+  for (let attempt = 0; attempt < retries; attempt++) {
+    const res = await fetch(url, { headers: getHeaders(), next: { revalidate } });
+    if (res.ok) {
+      const json = await res.json();
+      return { batch: json[resultsKey] ?? [], total: json.total_count ?? 0 };
+    }
+    if (res.status !== 504 || attempt === retries - 1) {
+      const text = await res.text();
+      throw new Error(`EasyStore API error ${res.status}: ${text}`);
+    }
+    // 504: back off then retry
+    await new Promise((r) => setTimeout(r, 1500 * (attempt + 1)));
+  }
+  throw new Error("EasyStore API: max retries exceeded");
+}
+
 async function fetchAll<T>(
   path: string,
   resultsKey: string,
   params: Record<string, string> = {},
   revalidate = 300
 ): Promise<T[]> {
-  const results: T[] = [];
-  let page = 1;
   const limit = 250;
 
-  while (true) {
-    const qs = new URLSearchParams({ limit: String(limit), page: String(page), ...params });
-    const res = await fetch(`${BASE_URL}${path}?${qs}`, {
-      headers: getHeaders(),
-      next: { revalidate },
-    });
-    if (!res.ok) {
-      const text = await res.text();
-      throw new Error(`EasyStore API error ${res.status}: ${text}`);
-    }
-    const json = await res.json();
-    const batch: T[] = json[resultsKey] ?? [];
-    results.push(...batch);
-    if (batch.length < limit) break;
-    page++;
+  // Fetch page 1 to get total count
+  const { batch: first, total } = await fetchOnePage<T>(path, resultsKey, 1, limit, params, revalidate);
+  const results: T[] = [...first];
+  if (first.length < limit) return results;
+
+  // Fetch remaining pages in parallel
+  const totalPages = Math.ceil(total / limit);
+  const remaining = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
+  const settled = await Promise.allSettled(
+    remaining.map((p) => fetchOnePage<T>(path, resultsKey, p, limit, params, revalidate))
+  );
+  for (const r of settled) {
+    if (r.status === "fulfilled") results.push(...r.value.batch);
+    else throw r.reason;
   }
 
   return results;
@@ -70,6 +94,13 @@ export interface ESLineItem {
   fulfillment_order_location_id: number | null;
 }
 
+export interface ESCustomer {
+  first_name: string;
+  last_name: string;
+  email: string | null;
+  phone: string | null;
+}
+
 export interface ESOrder {
   id: number;
   order_number: string;
@@ -81,6 +112,7 @@ export interface ESOrder {
   tags: string | null;
   location_id: number | null;
   source_name: string | null;
+  customer: ESCustomer | null;
   line_items: ESLineItem[];
   sales_attributions: {
     staff: ESStaffAttribution[];
@@ -161,6 +193,7 @@ const STAFF_NAME_MAP: Record<string, string> = {
   "pheng thong":  "Pheng Thong",
   "anusha":       "Anusha",
   "adelyn":       "Adelyn",
+  "nisa":         "Nisa",
 };
 
 function normaliseName(raw: string): string {
@@ -209,6 +242,12 @@ export function getSalesperson(order: ESOrder): string {
   }
 
   return "Unknown";
+}
+
+export function getCustomerName(order: ESOrder): string {
+  const c = order.customer;
+  if (!c) return "";
+  return [c.first_name, c.last_name].filter(Boolean).join(" ").trim();
 }
 
 export function getOrderBranch(order: ESOrder): string {

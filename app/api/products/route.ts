@@ -25,7 +25,7 @@ async function fetchPage(page: number): Promise<{ products: ESProduct[]; totalCo
   return { products: json.products ?? [], totalCount: json.total_count ?? 0 };
 }
 
-// Cache a single page for 10 minutes — used for progressive loading
+// Cache a single page for 30 minutes
 const getCachedPage = unstable_cache(
   async (page: number) => {
     const { products, totalCount } = await fetchPage(page);
@@ -34,10 +34,10 @@ const getCachedPage = unstable_cache(
     return { rows, page, totalPages, totalCount };
   },
   ["products-page"],
-  { revalidate: 600 }
+  { revalidate: 1800 }
 );
 
-// Cache the full product list for 30 minutes — the slow one
+// Cache the full product list for 1 hour
 const getCachedAllProducts = unstable_cache(
   async () => {
     const { products: firstPage, totalCount } = await fetchPage(1);
@@ -58,7 +58,7 @@ const getCachedAllProducts = unstable_cache(
     return { rows, totalPages, totalCount };
   },
   ["products-all"],
-  { revalidate: 1800 }
+  { revalidate: 3600 }
 );
 
 export async function GET(req: NextRequest) {

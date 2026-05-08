@@ -13,9 +13,10 @@ interface SalesRow {
   Order_Date: string;
   Month_Year: string;
   Salesperson: string;
+  Customer: string;
   Location: string;
   Product_SKU: string;
-  Brand: string;
+  Quantity: string;
   Sale_Price: string;
   Channel: string;
   Transaction_Type: string;
@@ -25,9 +26,10 @@ const COLUMNS = [
   { key: "Order_ID",        label: "Order ID" },
   { key: "Order_Date",      label: "Date" },
   { key: "Salesperson",     label: "Salesperson" },
+  { key: "Customer",        label: "Customer" },
   { key: "Location",        label: "Location" },
   { key: "Product_SKU",     label: "SKU" },
-  { key: "Brand",           label: "Brand" },
+  { key: "Quantity",        label: "Qty (HQ)" },
   { key: "Sale_Price",      label: "Sale Price (RM)" },
   { key: "Channel",         label: "Channel" },
   { key: "Transaction_Type",label: "Type" },
@@ -87,8 +89,8 @@ export default function SalesExportPage() {
     return (
       r.Order_ID.toLowerCase().includes(q) ||
       r.Salesperson.toLowerCase().includes(q) ||
+      (r.Customer ?? "").toLowerCase().includes(q) ||
       r.Product_SKU.toLowerCase().includes(q) ||
-      r.Brand.toLowerCase().includes(q) ||
       r.Location.toLowerCase().includes(q)
     );
   });
@@ -96,6 +98,8 @@ export default function SalesExportPage() {
   const totalRevenue = filtered.reduce((s, r) => s + (parseFloat(r.Sale_Price) || 0), 0);
   const companySales = filtered.filter((r) => r.Salesperson === "Company Sale").length;
   const unknown      = filtered.filter((r) => r.Salesperson === "Unknown").length;
+  const MAX_VISIBLE = 500;
+  const visible = filtered.slice(0, MAX_VISIBLE);
 
   return (
     <>
@@ -185,7 +189,7 @@ export default function SalesExportPage() {
                 </div>
               ))}
               <input
-                type="text" placeholder="Search order, name, SKU, brand…"
+                type="text" placeholder="Search order, salesperson, customer, SKU, brand…"
                 value={search} onChange={(e) => setSearch(e.target.value)}
                 className="ml-auto px-3 py-1.5 rounded-lg text-sm flex-1 min-w-[180px]"
                 style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-primary)" }}
@@ -215,11 +219,11 @@ export default function SalesExportPage() {
                         </td>
                       </tr>
                     ) : (
-                      filtered.map((row, i) => {
+                      visible.map((row, i) => {
                         const spColor = SP_COLORS[row.Salesperson];
                         return (
                           <tr key={i}
-                            style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
+                            style={{ borderBottom: i < visible.length - 1 ? "1px solid var(--border)" : "none" }}
                             className="hover:bg-[var(--bg-card-hover)] transition-colors">
                             <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{row.Order_ID}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>{row.Order_Date}</td>
@@ -227,9 +231,10 @@ export default function SalesExportPage() {
                               style={{ color: spColor ?? "var(--text-primary)" }}>
                               {row.Salesperson}
                             </td>
+                            <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-primary)" }}>{row.Customer || "—"}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-secondary)" }}>{row.Location}</td>
                             <td className="px-4 py-2.5 font-mono text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>{row.Product_SKU || "—"}</td>
-                            <td className="px-4 py-2.5 whitespace-nowrap text-xs" style={{ color: "var(--text-primary)" }}>{row.Brand || "—"}</td>
+                            <td className="px-4 py-2.5 whitespace-nowrap text-xs text-center" style={{ color: "var(--text-primary)" }}>{row.Quantity || "—"}</td>
                             <td className="px-4 py-2.5 whitespace-nowrap font-semibold text-right" style={{ color: "var(--accent)" }}>
                               {formatRM(parseFloat(row.Sale_Price) || 0)}
                             </td>
@@ -242,8 +247,14 @@ export default function SalesExportPage() {
                   </tbody>
                 </table>
               </div>
-              <div className="px-5 py-3 text-xs" style={{ borderTop: "1px solid var(--border)", color: "var(--text-secondary)" }}>
-                {filtered.length} rows · {formatRM(totalRevenue)} total
+              <div className="px-5 py-3 text-xs flex items-center justify-between gap-2 flex-wrap"
+                style={{ borderTop: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                <span>{filtered.length} rows · {formatRM(totalRevenue)} total</span>
+                {filtered.length > MAX_VISIBLE && (
+                  <span style={{ color: "#f59e0b" }}>
+                    Showing first {MAX_VISIBLE} of {filtered.length} — refine search or download CSV for full data
+                  </span>
+                )}
               </div>
             </div>
           </>

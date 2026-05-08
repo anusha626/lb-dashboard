@@ -80,6 +80,7 @@ export interface ProductRow {
   costPrice: number;
   profitRM: number;
   profitPct: number;
+  inventory: number;
   soldAt?: string;
   soldBranch?: string;
 }
@@ -150,7 +151,7 @@ export function buildProductRows(
     const sellingPrice = getProductSellingPrice(p);
     const costPrice = getProductCostPrice(p);
     const profitRM = sellingPrice - costPrice;
-    const profitPct = costPrice > 0 ? (profitRM / costPrice) * 100 : 0;
+    const profitPct = sellingPrice > 0 ? (profitRM / sellingPrice) * 100 : 0;
     // Determine status:
     // - Found in an order → Sold
     // - inventory > 0 and published → Active
@@ -189,6 +190,7 @@ export function buildProductRows(
       costPrice,
       profitRM,
       profitPct,
+      inventory: getProductInventory(p),
       soldAt,
       soldBranch,
     };
@@ -203,7 +205,7 @@ export function buildProductRowsLight(products: ESProduct[], today: Date): Produ
     const sellingPrice = getProductSellingPrice(p);
     const costPrice = getProductCostPrice(p);
     const profitRM = sellingPrice - costPrice;
-    const profitPct = costPrice > 0 ? (profitRM / costPrice) * 100 : 0;
+    const profitPct = sellingPrice > 0 ? (profitRM / sellingPrice) * 100 : 0;
     const inventory = getProductInventory(p);
     const daysListed = differenceInDays(today, createdAt);
 
@@ -242,6 +244,7 @@ export function buildProductRowsLight(products: ESProduct[], today: Date): Produ
       costPrice,
       profitRM,
       profitPct,
+      inventory,
     };
   });
 }

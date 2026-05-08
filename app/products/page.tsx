@@ -47,10 +47,13 @@ export default function ProductPerformancePage() {
   const [error, setError] = useState<string | null>(null);
 
   const [sortKey, setSortKey] = useState<SortKey>("daysToSell");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [filterBranch, setFilterBranch] = useState("All");
   const [filterStatus, setFilterStatus] = useState<FilterStatus>("All");
   const [search, setSearch] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [expandedIds, setExpandedIds] = useState<Set<number>>(new Set());
+  const [dateTo, setDateTo] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
   const loadPage = useCallback(async (p: number, append: boolean) => {
@@ -89,7 +92,10 @@ export default function ProductPerformancePage() {
     }
   }, []);
 
-  useEffect(() => { loadPage(1, false); }, [loadPage]);
+  useEffect(() => {
+    // Show first 250 instantly, then silently load everything else
+    loadPage(1, false).then(() => loadAll());
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   const branches = useMemo(() => {
     const set = new Set(rows.map((r) => r.branch));
@@ -116,6 +122,14 @@ export default function ProductPerformancePage() {
           r.brand.toLowerCase().includes(q)
       );
     }
+    if (dateFrom) {
+      const from = new Date(dateFrom + "T00:00:00");
+      out = out.filter((r) => new Date(r.createdAt) >= from);
+    }
+    if (dateTo) {
+      const to = new Date(dateTo + "T23:59:59");
+      out = out.filter((r) => new Date(r.createdAt) <= to);
+    }
     return [...out].sort((a, b) => {
       const av = a[sortKey];
       const bv = b[sortKey];
@@ -125,7 +139,7 @@ export default function ProductPerformancePage() {
           : String(av).localeCompare(String(bv));
       return sortDir === "asc" ? cmp : -cmp;
     });
-  }, [rows, filterBranch, filterStatus, search, sortKey, sortDir]);
+  }, [rows, filterBranch, filterStatus, search, dateFrom, dateTo, sortKey, sortDir]);
 
   function toggleSort(key: SortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -202,7 +216,7 @@ export default function ProductPerformancePage() {
           <div>
             <h1 className="text-xl font-bold" style={{ color: "var(--text-primary)" }}>Product Performance</h1>
             <p className="text-sm mt-0.5" style={{ color: "var(--text-secondary)" }}>
-              Oldest products first · sorted by days listed
+              Newest products first · sorted by days listed
             </p>
           </div>
 
@@ -435,6 +449,26 @@ export default function ProductPerformancePage() {
                   </button>
                 ))}
               </div>
+              {/* Date listed range */}
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs whitespace-nowrap" style={{ color: "var(--text-secondary)" }}>Listed</span>
+                <input type="date" value={dateFrom} max={dateTo || undefined}
+                  onChange={(e) => setDateFrom(e.target.value)}
+                  className="px-3 py-2 rounded-lg text-sm"
+                  style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-primary)", colorScheme: "dark" }} />
+                <span className="text-xs" style={{ color: "var(--text-secondary)" }}>–</span>
+                <input type="date" value={dateTo} min={dateFrom || undefined}
+                  onChange={(e) => setDateTo(e.target.value)}
+                  className="px-3 py-2 rounded-lg text-sm"
+                  style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-primary)", colorScheme: "dark" }} />
+                {(dateFrom || dateTo) && (
+                  <button onClick={() => { setDateFrom(""); setDateTo(""); }}
+                    className="px-2 py-2 rounded-lg text-xs"
+                    style={{ background: "var(--bg-card)", border: "1px solid var(--border)", color: "var(--text-secondary)" }}>
+                    ✕
+                  </button>
+                )}
+              </div>
             </div>
 
             {/* Table */}
@@ -453,6 +487,7 @@ export default function ProductPerformancePage() {
                       <th className={thClass} style={{ color: "var(--text-secondary)" }} onClick={() => toggleSort("daysToSell")}>
                         Days <SortIcon col="daysToSell" sortKey={sortKey} dir={sortDir} />
                       </th>
+                      <th className={thClass} style={{ color: "var(--text-secondary)" }}>Qty</th>
                       <th className={thClass} style={{ color: "var(--text-secondary)" }} onClick={() => toggleSort("status")}>
                         Status <SortIcon col="status" sortKey={sortKey} dir={sortDir} />
                       </th>
@@ -473,7 +508,7 @@ export default function ProductPerformancePage() {
                   <tbody>
                     {filtered.length === 0 ? (
                       <tr>
-                        <td colSpan={9} className="px-5 py-12 text-center text-sm" style={{ color: "var(--text-secondary)" }}>
+                        <td colSpan={10} className="px-5 py-12 text-center text-sm" style={{ color: "var(--text-secondary)" }}>
                           No products found
                         </td>
                       </tr>
@@ -482,8 +517,17 @@ export default function ProductPerformancePage() {
                         <tr key={row.id}
                           style={{ borderBottom: i < filtered.length - 1 ? "1px solid var(--border)" : "none" }}
                           className="transition-colors hover:bg-[var(--bg-card-hover)]">
-                          <td className="px-4 py-3 max-w-[220px]">
-                            <div className="font-medium truncate" style={{ color: "var(--text-primary)" }} title={row.name}>
+                          <td className="px-4 py-3" style={{ maxWidth: expandedIds.has(row.id) ? undefined : "220px" }}>
+                            <div
+                              className={`font-medium cursor-pointer ${expandedIds.has(row.id) ? "whitespace-normal" : "truncate"}`}
+                              style={{ color: "var(--text-primary)" }}
+                              onClick={() => setExpandedIds((prev) => {
+                                const next = new Set(prev);
+                                next.has(row.id) ? next.delete(row.id) : next.add(row.id);
+                                return next;
+                              })}
+                              title={expandedIds.has(row.id) ? undefined : row.name}
+                            >
                               {row.name}
                             </div>
                             <div className="text-xs mt-0.5" style={{ color: "var(--text-secondary)" }}>
@@ -506,6 +550,9 @@ export default function ProductPerformancePage() {
                             }}>
                               {row.daysLabel}
                             </span>
+                          </td>
+                          <td className="px-4 py-3 whitespace-nowrap text-sm text-center" style={{ color: "var(--text-primary)" }}>
+                            {row.inventory}
                           </td>
                           <td className="px-4 py-3 whitespace-nowrap">
                             <StatusBadge status={row.status} />
