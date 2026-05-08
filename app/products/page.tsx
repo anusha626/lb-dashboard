@@ -57,7 +57,8 @@ export default function ProductPerformancePage() {
   const [viewMode, setViewMode] = useState<ViewMode>("table");
 
   // GAS returns all products in one shot — no pagination needed
-  const loadAll = useCallback(async () => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const loadPage = useCallback(async (_p?: number, _append?: boolean) => {
     setLoading(true);
     setError(null);
     try {
@@ -76,7 +77,7 @@ export default function ProductPerformancePage() {
     }
   }, []);
 
-  const loadPage = loadAll; // alias — kept for compatibility
+  const loadAll = loadPage;
 
   useEffect(() => {
     loadAll();
