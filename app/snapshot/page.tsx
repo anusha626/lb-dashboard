@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Nav from "@/components/Nav";
 import type { SnapshotData } from "@/app/api/snapshot/route";
 
 const fmtRM = (n: number) => "RM " + Math.round(n).toLocaleString();
@@ -73,6 +74,8 @@ export default function SnapshotPage() {
   const maxRev = data ? Math.max(...data.leaderboard.map((p) => p.revenue), 1) : 1;
 
   return (
+    <>
+    <Nav />
     <div style={{ maxWidth: 560, margin: "0 auto", padding: "24px 16px 60px", color: "var(--text-primary)" }}>
       <div style={{ marginBottom: 24 }}>
         <h1 style={{ fontSize: 32, fontWeight: 300, letterSpacing: 0.5, margin: 0 }}>LBITE</h1>
@@ -199,5 +202,6 @@ export default function SnapshotPage() {
         </div>
       )}
     </div>
+    </>
   );
 }
