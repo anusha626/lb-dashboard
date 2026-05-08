@@ -201,13 +201,18 @@ const NOT_A_NAME = /sale|transfer|cash|online|walk|mbb|rhb|bank|maybank|rm\d|con
 
 export function getSalesperson(order: ESOrder): string {
   const note = order.note?.trim() ?? "";
+  const rawStaff = order.sales_attributions?.staff?.[0]?.user_name;
 
   // 1. Company sale — label explicitly (no individual commission)
   if (/^company\s*sale/i.test(note)) return "Company Sale";
 
-  // 2. Primary: sales_attributions.staff (POS / assigned staff)
-  const staffName = order.sales_attributions?.staff?.[0]?.user_name;
-  if (staffName) return normaliseName(staffName);
+  // 2. Staff attribution — only trust it if it maps to a known name in our list.
+  //    ChatDaddy / online orders often auto-assign a system user; in that case
+  //    we fall through to check the note and tags instead.
+  if (rawStaff) {
+    const mapped = STAFF_NAME_MAP[rawStaff.toLowerCase().trim()];
+    if (mapped) return mapped;
+  }
 
   // 3. Check all comma-separated segments of the note, plus first 1-2 words of each
   //    Handles "ONLINE TRANSFER, MINKEI, LILY" — name at any position
@@ -239,6 +244,10 @@ export function getSalesperson(order: ESOrder): string {
       return normaliseName(capitalised);
     }
   }
+
+  // 6. Fall back to raw staff attribution for POS orders where the user name
+  //    isn't in our alias list yet (keeps them out of "Unknown")
+  if (rawStaff) return normaliseName(rawStaff);
 
   return "Unknown";
 }
