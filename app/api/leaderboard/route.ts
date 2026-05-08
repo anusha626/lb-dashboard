@@ -109,8 +109,8 @@ async function computeLeaderboard(from: string, to: string): Promise<Leaderboard
 }
 
 // 5 min cache for current period, 12 hours for past periods
-const getCachedLeaderboard = unstable_cache(computeLeaderboard, ["leaderboard-v3-current"], { revalidate: 300 });
-const getCachedLeaderboardPast = unstable_cache(computeLeaderboard, ["leaderboard-v3-past"], { revalidate: 43200 });
+const getCachedLeaderboard = unstable_cache(computeLeaderboard, ["leaderboard-v4-current"], { revalidate: 300 });
+const getCachedLeaderboardPast = unstable_cache(computeLeaderboard, ["leaderboard-v4-past"], { revalidate: 43200 });
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);

@@ -215,14 +215,17 @@ export function getSalesperson(order: ESOrder): string {
   const staffName = order.sales_attributions?.staff?.[0]?.user_name;
   if (staffName) return normaliseName(staffName);
 
-  // 3. First one or two words of note checked against known staff map
-  //    Handles "ERONNE ONLINE TRANSFER..." and "MIN KEI CHATDADDY..."
+  // 3. Check all comma-separated segments of the note, plus first 1-2 words of each
+  //    Handles "ONLINE TRANSFER, MINKEI, LILY" — name at any position
   if (note) {
-    const words = note.split(/[\s\n]/).filter(Boolean);
-    const firstTwo = words.slice(0, 2).join(" ").toLowerCase();
-    const firstOne = words[0]?.toLowerCase() ?? "";
-    if (STAFF_NAME_MAP[firstTwo]) return STAFF_NAME_MAP[firstTwo];
-    if (STAFF_NAME_MAP[firstOne]) return STAFF_NAME_MAP[firstOne];
+    const segments = note.split(",").map((s) => s.trim()).filter(Boolean);
+    for (const seg of segments) {
+      const words = seg.split(/\s+/).filter(Boolean);
+      const one = words[0]?.toLowerCase() ?? "";
+      const two = words.slice(0, 2).join(" ").toLowerCase();
+      if (STAFF_NAME_MAP[two]) return STAFF_NAME_MAP[two];
+      if (STAFF_NAME_MAP[one]) return STAFF_NAME_MAP[one];
+    }
   }
 
   // 4. Order tags — check each tag against known staff names

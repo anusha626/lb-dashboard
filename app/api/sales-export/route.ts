@@ -95,8 +95,8 @@ async function computeSalesRows(from: string, to: string): Promise<Record<string
 }
 
 // 5 min for current period, 12 hours for completed past periods
-const getCachedRows = unstable_cache(computeSalesRows, ["sales-export-current-v5"], { revalidate: 300 });
-const getCachedRowsPast = unstable_cache(computeSalesRows, ["sales-export-past-v5"], { revalidate: 43200 });
+const getCachedRows = unstable_cache(computeSalesRows, ["sales-export-current-v6"], { revalidate: 300 });
+const getCachedRowsPast = unstable_cache(computeSalesRows, ["sales-export-past-v6"], { revalidate: 43200 });
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
