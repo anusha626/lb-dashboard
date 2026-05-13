@@ -82,6 +82,7 @@ function mapGASProduct(p: GASProduct, i: number): ProductRow & { listedDateISO: 
     profitRM: Number(p.profit) || 0,
     profitPct: Number(p.margin_pct) || 0,
     inventory: Number(p.easystore_inventory) || 0,
+    intakeType: p.intake_type || "",
   };
 }
 
@@ -92,7 +93,7 @@ const getCachedProducts = unstable_cache(
     const rows = products.map(mapGASProduct);
     return { rows, totalCount: rows.length };
   },
-  ["gas-products-v2"],
+  ["gas-products-v3"],
   { revalidate: 1800 }
 );
 

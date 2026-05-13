@@ -18,6 +18,8 @@ export default function ClearancePage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterBranch, setFilterBranch] = useState("All");
+  const [filterStatus, setFilterStatus] = useState<"All" | "Published" | "Unpublished">("All");
+  const [filterIntake, setFilterIntake] = useState<"All" | "Cash Buy" | "Consignment">("All");
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<"daysToSell" | "sellingPrice" | "costPrice">("daysToSell");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
@@ -57,6 +59,18 @@ export default function ClearancePage() {
   const filtered = useMemo(() => {
     let out = aged90;
     if (filterBranch !== "All") out = out.filter((r) => r.branch === filterBranch);
+    if (filterStatus !== "All") {
+      const wantPublished = filterStatus === "Published";
+      out = out.filter((r) => (r.status === "Active") === wantPublished);
+    }
+    if (filterIntake !== "All") {
+      out = out.filter((r) => {
+        const it = (r.intakeType || "").toLowerCase();
+        if (filterIntake === "Cash Buy") return it.includes("cash");
+        if (filterIntake === "Consignment") return it.includes("consign");
+        return true;
+      });
+    }
     if (search.trim()) {
       const q = search.toLowerCase();
       out = out.filter(
@@ -70,7 +84,7 @@ export default function ClearancePage() {
       const bv = b[sortKey] as number;
       return sortDir === "asc" ? av - bv : bv - av;
     });
-  }, [aged90, filterBranch, search, sortKey, sortDir]);
+  }, [aged90, filterBranch, filterStatus, filterIntake, search, sortKey, sortDir]);
 
   function toggleSort(key: typeof sortKey) {
     if (sortKey === key) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -208,6 +222,42 @@ export default function ClearancePage() {
             )}
 
             {/* Filters */}
+            {/* Row 1: Published / Unpublished + Cash Buy / Consignment */}
+            <div className="flex flex-wrap gap-2 mb-2">
+              {/* Status filter */}
+              <div className="flex rounded-lg overflow-hidden text-xs font-medium"
+                style={{ border: "1px solid var(--border)" }}>
+                {(["All", "Published", "Unpublished"] as const).map((opt) => (
+                  <button key={opt} onClick={() => setFilterStatus(opt)}
+                    className="px-3 py-2 transition-colors"
+                    style={{
+                      background: filterStatus === opt ? "var(--accent)" : "var(--bg-card)",
+                      color: filterStatus === opt ? "#fff" : "var(--text-secondary)",
+                      borderRight: opt !== "Unpublished" ? "1px solid var(--border)" : "none",
+                    }}>
+                    {opt === "Published" ? "🟢 Published" : opt === "Unpublished" ? "⚫ Unpublished" : "All Status"}
+                  </button>
+                ))}
+              </div>
+
+              {/* Intake type filter */}
+              <div className="flex rounded-lg overflow-hidden text-xs font-medium"
+                style={{ border: "1px solid var(--border)" }}>
+                {(["All", "Cash Buy", "Consignment"] as const).map((opt) => (
+                  <button key={opt} onClick={() => setFilterIntake(opt)}
+                    className="px-3 py-2 transition-colors"
+                    style={{
+                      background: filterIntake === opt ? "var(--accent)" : "var(--bg-card)",
+                      color: filterIntake === opt ? "#fff" : "var(--text-secondary)",
+                      borderRight: opt !== "Consignment" ? "1px solid var(--border)" : "none",
+                    }}>
+                    {opt === "Cash Buy" ? "💵 Cash Buy" : opt === "Consignment" ? "🤝 Consignment" : "All Types"}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Row 2: Search + Branch dropdown */}
             <div className="flex flex-wrap gap-2 mb-4">
               <input
                 type="text"

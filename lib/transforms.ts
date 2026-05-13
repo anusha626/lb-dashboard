@@ -81,6 +81,7 @@ export interface ProductRow {
   profitRM: number;
   profitPct: number;
   inventory: number;
+  intakeType?: string;   // "Cash Buy" | "Consignment" | etc.
   soldAt?: string;
   soldBranch?: string;
 }
