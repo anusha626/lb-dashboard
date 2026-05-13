@@ -13,6 +13,7 @@ export default function Nav() {
     { href: "/clearance", label: "🚨 Clear Now" },
     { href: "/snapshot", label: "📊 Snapshot" },
     { href: "/staff", label: "👤 Staff" },
+    { href: "/cash",  label: "💰 Cash" },
   ];
 
   return (
