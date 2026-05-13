@@ -38,9 +38,14 @@ export default function ClearancePage() {
     })();
   }, []);
 
-  // Only active items aged 90+ days
+  // Active + Draft items aged 90+ days with at least 1 unit in inventory
   const aged90 = useMemo(
-    () => allRows.filter((r) => r.status === "Active" && r.daysToSell > 90),
+    () => allRows.filter(
+      (r) =>
+        (r.status === "Active" || r.status === "Draft") &&
+        r.daysToSell > 90 &&
+        r.inventory >= 1
+    ),
     [allRows]
   );
 
@@ -137,7 +142,7 @@ export default function ClearancePage() {
               🚨 Clear This Now
             </h1>
             <p className="text-sm mt-1" style={{ color: "var(--text-secondary)" }}>
-              Active stock sitting for <strong style={{ color: "#f59e0b" }}>90+ days</strong> — needs to move
+              Published &amp; unpublished stock sitting for <strong style={{ color: "#f59e0b" }}>90+ days</strong> with inventory ≥ 1 — needs to move
             </p>
           </div>
           {!loading && filtered.length > 0 && (
@@ -245,11 +250,13 @@ export default function ClearancePage() {
                     <thead>
                       <tr style={{ borderBottom: "1px solid var(--border)", background: "var(--bg-base)" }}>
                         <th style={thStyle}>Product</th>
+                        <th style={thStyle}>Status</th>
                         <th style={thStyle}>Branch</th>
                         <th style={thStyle}>Listed</th>
                         <th style={{ ...thStyle, cursor: "pointer" }} onClick={() => toggleSort("daysToSell")}>
                           Days <SortIcon col="daysToSell" />
                         </th>
+                        <th style={{ ...thStyle, textAlign: "right" }}>Qty</th>
                         <th style={{ ...thStyle, textAlign: "right" }} onClick={() => toggleSort("sellingPrice")}>
                           Sell Price <SortIcon col="sellingPrice" />
                         </th>
@@ -273,6 +280,14 @@ export default function ClearancePage() {
                                 {row.sku}
                               </div>
                             </td>
+                            <td className="px-4 py-3 whitespace-nowrap">
+                              <span className="text-xs font-medium px-2 py-0.5 rounded-full"
+                                style={row.status === "Active"
+                                  ? { color: "#22c55e", background: "rgba(34,197,94,0.12)" }
+                                  : { color: "#94a3b8", background: "rgba(148,163,184,0.12)" }}>
+                                {row.status === "Active" ? "Published" : "Unpublished"}
+                              </span>
+                            </td>
                             <td className="px-4 py-3 whitespace-nowrap text-sm" style={{ color: "var(--text-secondary)" }}>
                               {row.branch || "—"}
                             </td>
@@ -284,6 +299,9 @@ export default function ClearancePage() {
                                 style={{ color: ageColor, background: `${ageColor}18` }}>
                                 {row.daysToSell}d
                               </span>
+                            </td>
+                            <td className="px-4 py-3 whitespace-nowrap text-right text-sm font-medium" style={{ color: "var(--text-primary)" }}>
+                              {row.inventory}
                             </td>
                             <td className="px-4 py-3 whitespace-nowrap text-right font-semibold" style={{ color: "var(--text-primary)" }}>
                               {row.sellingPrice > 0 ? formatRM(row.sellingPrice) : "—"}
