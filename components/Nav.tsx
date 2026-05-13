@@ -10,6 +10,7 @@ export default function Nav() {
     { href: "/leaderboard", label: "🏆 Leaderboard" },
     { href: "/products", label: "Products" },
     { href: "/sales", label: "Sales Data" },
+    { href: "/clearance", label: "🚨 Clear Now" },
     { href: "/snapshot", label: "📊 Snapshot" },
     { href: "/staff", label: "👤 Staff" },
   ];
