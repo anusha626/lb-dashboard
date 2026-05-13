@@ -32,8 +32,23 @@ function isoFromListedDate(raw: string): string {
   return "";
 }
 
+// Compute days from listed_date → today ourselves so aging is always exact,
+// not dependent on GAS's pre-computed (potentially stale) days_listed value.
+function daysFromListedDate(raw: string): number {
+  const iso = isoFromListedDate(raw);
+  if (!iso) return 0;
+  const listed = new Date(iso + "T00:00:00");
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const diff = Math.floor((today.getTime() - listed.getTime()) / 86_400_000);
+  return Math.max(0, diff);
+}
+
 function mapGASProduct(p: GASProduct, i: number): ProductRow & { listedDateISO: string } {
-  const daysListed = Number(p.days_listed) || 0;
+  // Always recalculate from listed_date — don't trust GAS's cached days_listed
+  const daysListed = p.listed_date
+    ? daysFromListedDate(p.listed_date)
+    : Number(p.days_listed) || 0;
   const statusStr = (p.status || "").toLowerCase();
   const isSold = p.sold === true || statusStr === "sold";
   const isActive = !isSold && (p.active === true || statusStr === "active");
@@ -77,7 +92,7 @@ const getCachedProducts = unstable_cache(
     const rows = products.map(mapGASProduct);
     return { rows, totalCount: rows.length };
   },
-  ["gas-products-v1"],
+  ["gas-products-v2"],
   { revalidate: 1800 }
 );
 

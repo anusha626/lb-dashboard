@@ -72,15 +72,31 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 5);
 
-  // Inventory aging from GAS products
+  // Inventory aging from GAS products — recalculate days from listed_date
+  function isoFromRaw(raw: string): string {
+    if (!raw) return "";
+    const iso = raw.match(/^(\d{4}-\d{2}-\d{2})/);
+    if (iso) return iso[1];
+    const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})/);
+    if (dmy) return `${dmy[3]}-${dmy[2].padStart(2, "0")}-${dmy[1].padStart(2, "0")}`;
+    return "";
+  }
+  function daysListed(p: GASProduct): number {
+    const iso = isoFromRaw(p.listed_date ?? "");
+    if (!iso) return Number(p.days_listed) || 0;
+    const listed = new Date(iso + "T00:00:00");
+    const today = new Date(); today.setHours(0, 0, 0, 0);
+    return Math.max(0, Math.floor((today.getTime() - listed.getTime()) / 86_400_000));
+  }
+
   const activeProducts = products.filter((p) => {
     const statusLower = (p.status || "").toLowerCase();
     return !p.sold && (p.active || statusLower === "active");
   });
 
-  const aged90 = activeProducts.filter((p) => Number(p.days_listed) > 90);
-  const aged60 = activeProducts.filter((p) => Number(p.days_listed) > 60 && Number(p.days_listed) <= 90);
-  const aged30 = activeProducts.filter((p) => Number(p.days_listed) > 30 && Number(p.days_listed) <= 60);
+  const aged90 = activeProducts.filter((p) => daysListed(p) > 90);
+  const aged60 = activeProducts.filter((p) => daysListed(p) > 60 && daysListed(p) <= 90);
+  const aged30 = activeProducts.filter((p) => daysListed(p) > 30 && daysListed(p) <= 60);
   const aged90Value = aged90.reduce((s, p) => s + (Number(p.cost) || 0), 0);
 
   return {
@@ -96,8 +112,8 @@ async function computeSnapshot(from: string, to: string): Promise<SnapshotData> 
   };
 }
 
-const getCachedSnapshot = unstable_cache(computeSnapshot, ["gas-snapshot-v1-current"], { revalidate: 300 });
-const getCachedSnapshotPast = unstable_cache(computeSnapshot, ["gas-snapshot-v1-past"], { revalidate: 1800 });
+const getCachedSnapshot = unstable_cache(computeSnapshot, ["gas-snapshot-v2-current"], { revalidate: 300 });
+const getCachedSnapshotPast = unstable_cache(computeSnapshot, ["gas-snapshot-v2-past"], { revalidate: 1800 });
 
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
